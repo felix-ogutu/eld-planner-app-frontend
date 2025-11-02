@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import './App.css'
+import {API_BASE, apiUrl} from "./lib/api.ts";
 
 // Define types inline
 interface FormData {
@@ -47,31 +48,33 @@ function App() {
     const [error, setError] = useState<string | null>(null)
 
     const handleSubmit = async (): Promise<void> => {
-        setLoading(true)
-        setError(null)
-
+        setLoading(true);
+        setError(null);
         try {
-            const response = await fetch('https://eld-planner-app-backend/api/calculate-trip/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(formData)
-            })
+            const response = await fetch(
+                apiUrl('/api/calculate-trip/'),   // ← uses correct base
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        currentLocation: formData.currentLocation,
+                        pickupLocation: formData.pickupLocation,
+                        dropoffLocation: formData.dropoffLocation,
+                        currentCycleUsed: Number(formData.currentCycleUsed),
+                    }),
+                }
+            );
 
-            const data = await response.json()
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error ?? 'Failed to calculate trip');
 
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to calculate trip')
-            }
-
-            setResults(data)
+            setResults(data);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred')
+            setError(err instanceof Error ? err.message : 'An error occurred');
         } finally {
-            setLoading(false)
+            setLoading(false);
         }
-    }
+    };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
         setFormData({
@@ -81,18 +84,43 @@ function App() {
     }
 
     const handleViewELDLog = async () => {
-        if (!results) return
+        if (!results?.eldLogUrl) {
+            setError('ELD log URL not available');
+            return;
+        }
 
         try {
-            const response = await fetch(`https://eld-planner-app-backend${results.eldLogUrl}`)
-            const data = await response.json()
+            console.log('Fetching ELD log from:', results.eldLogUrl);
 
-            // Open the PDF URL in new tab
-            window.open(`http://localhost:8000${data.pdfUrl}`, '_blank')
+            // Step 1: Call API to generate/get PDF URL
+            const fullLogEndpoint = apiUrl(results.eldLogUrl);
+            const response = await fetch(fullLogEndpoint);
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to generate ELD log');
+            }
+
+            const data = await response.json();
+            console.log('Received data:', data);
+            console.log('PDF URL:', data.pdfUrl);
+
+            // Step 2: Open the PDF
+            // In dev: Vite proxy handles /media/...
+            // In prod: Use full backend URL
+            const pdfFullUrl = import.meta.env.DEV
+                ? data.pdfUrl  // "/media/logs/eld_log_123.pdf"
+                : `${API_BASE}${data.pdfUrl}`;
+
+            console.log('Opening PDF at:', pdfFullUrl);
+
+            window.open(pdfFullUrl, '_blank', 'noopener,noreferrer');
+
         } catch (err) {
-            console.error('Error loading ELD log:', err)
+            console.error('Error loading ELD log:', err);
+            setError(err instanceof Error ? err.message : 'Failed to load ELD log');
         }
-    }
+    };
 
     return (
         <>
