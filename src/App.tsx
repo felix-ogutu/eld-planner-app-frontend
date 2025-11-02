@@ -51,7 +51,7 @@ function App() {
         setError(null)
 
         try {
-            const response = await fetch('http://localhost:8000/api/calculate-trip/', {
+            const response = await fetch('https://eld-planner-app-backend/api/calculate-trip/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -84,7 +84,7 @@ function App() {
         if (!results) return
 
         try {
-            const response = await fetch(`http://localhost:8000${results.eldLogUrl}`)
+            const response = await fetch(`https://eld-planner-app-backend${results.eldLogUrl}`)
             const data = await response.json()
 
             // Open the PDF URL in new tab
